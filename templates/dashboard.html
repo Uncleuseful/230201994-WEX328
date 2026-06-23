@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sentiment Analysis - Yusuf Salah</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-2.16.1.min.js"></script>
+    <style>
+        body { background: #f0f2f5; padding: 20px; }
+        .card { background: white; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 15px; padding: 30px; }
+        .stat-box { background: white; border-radius: 10px; padding: 20px; text-align: center; }
+        .stat-number { font-size: 32px; font-weight: bold; color: #667eea; }
+        .btn-predict { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border: none; padding: 12px 30px; border-radius: 10px; }
+        .confidence-bar { height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden; margin-top: 10px; }
+        .confidence-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); transition: width 0.5s; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header text-center">
+        <h1>🎯 Amazon Alexa Sentiment Analysis</h1>
+        <p><strong>Student:</strong> Yusuf Salah | <strong>No:</strong> 230201994 | <strong>Course:</strong> WEX328</p>
+    </div>
+
+    <div class="card">
+        <h4>🔮 Predict Sentiment</h4>
+        <div class="row">
+            <div class="col-md-7">
+                <textarea id="reviewInput" rows="3" class="form-control" placeholder="Type a review..."></textarea>
+            </div>
+            <div class="col-md-5">
+                <select id="modelSelect" class="form-control mb-2">
+                    <option value="Logistic Regression">Logistic Regression</option>
+                    <option value="Naive Bayes">Naive Bayes</option>
+                    <option value="SVM">SVM</option>
+                </select>
+                <button onclick="predict()" class="btn btn-predict w-100">🚀 Analyze</button>
+            </div>
+        </div>
+        <div id="resultBox" style="display:none; margin-top:15px;">
+            <div class="alert" id="resultAlert">
+                <strong>Sentiment:</strong> <span id="sentimentDisplay"></span><br>
+                <strong>Confidence:</strong> <span id="confidenceDisplay"></span>
+            </div>
+            <div class="confidence-bar"><div id="confidenceBar" class="confidence-fill" style="width:0%"></div></div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-3"><div class="stat-box"><div class="stat-number" id="totalReviews">0</div><p>Total</p></div></div>
+        <div class="col-md-3"><div class="stat-box" style="border-left:4px solid #28a745;"><div class="stat-number" style="color:#28a745;" id="positiveCount">0</div><p>👍 Positive</p></div></div>
+        <div class="col-md-3"><div class="stat-box" style="border-left:4px solid #dc3545;"><div class="stat-number" style="color:#dc3545;" id="negativeCount">0</div><p>👎 Negative</p></div></div>
+        <div class="col-md-3"><div class="stat-box" style="border-left:4px solid #ffc107;"><div class="stat-number" style="color:#ffc107;" id="neutralCount">0</div><p>😐 Neutral</p></div></div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8"><div class="card"><h5>📈 Trends</h5><div id="trendChart" style="height:300px;"></div></div></div>
+        <div class="col-md-4"><div class="card"><h5>📊 Distribution</h5><div id="pieChart" style="height:300px;"></div></div></div>
+    </div>
+
+    <div class="card">
+        <h5>📋 Recent Predictions</h5>
+        <table class="table table-striped"><thead><tr><th>Review</th><th>Sentiment</th><th>Confidence</th></tr></thead><tbody id="predictionsTable"></tbody></table>
+    </div>
+</div>
+
+<script>
+function predict() {
+    const review = document.getElementById('reviewInput').value;
+    const model = document.getElementById('modelSelect').value;
+    if (!review.trim()) { alert('Please enter a review.'); return; }
+    
+    fetch('/api/predict', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({review: review, model: model})
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById('resultBox').style.display = 'block';
+        const colors = {'Positive':'success','Negative':'danger','Neutral':'warning'};
+        document.getElementById('resultAlert').className = `alert alert-${colors[data.sentiment] || 'info'}`;
+        document.getElementById('sentimentDisplay').textContent = data.sentiment;
+        document.getElementById('confidenceDisplay').textContent = (data.confidence * 100).toFixed(1) + '%';
+        document.getElementById('confidenceBar').style.width = (data.confidence * 100) + '%';
+        loadStats(); loadCharts(); loadPredictions();
+    });
+}
+
+function loadStats() {
+    fetch('/api/stats').then(res => res.json()).then(data => {
+        let total=0, pos=0, neg=0, neu=0;
+        data.forEach(d => { total += d.total||0; pos += d.positive||0; neg += d.negative||0; neu += d.neutral||0; });
+        document.getElementById('totalReviews').textContent = total;
+        document.getElementById('positiveCount').textContent = pos;
+        document.getElementById('negativeCount').textContent = neg;
+        document.getElementById('neutralCount').textContent = neu;
+    });
+}
+
+function loadCharts() {
+    fetch('/api/trends').then(res => res.json()).then(data => {
+        const traces = [
+            {x: data.dates, y: data.total, type:'scatter', mode:'lines+markers', name:'Total', line:{color:'#667eea'}},
+            {x: data.dates, y: data.positive, type:'scatter', mode:'lines', name:'Positive', line:{color:'#28a745'}},
+            {x: data.dates, y: data.negative, type:'scatter', mode:'lines', name:'Negative', line:{color:'#dc3545'}},
+            {x: data.dates, y: data.neutral, type:'scatter', mode:'lines', name:'Neutral', line:{color:'#ffc107'}}
+        ];
+        Plotly.newPlot('trendChart', traces, {margin:{l:50,r:30,t:30,b:50}});
+        const last = data.total.length - 1;
+        Plotly.newPlot('pieChart', [{
+            values: [data.positive[last]||0, data.negative[last]||0, data.neutral[last]||0],
+            labels: ['Positive','Negative','Neutral'], type:'pie',
+            marker: {colors: ['#28a745','#dc3545','#ffc107']}
+        }], {margin:{l:20,r:20,t:30,b:20}});
+    });
+}
+
+function loadPredictions() {
+    fetch('/api/predictions/recent').then(res => res.json()).then(data => {
+        const tbody = document.getElementById('predictionsTable');
+        if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="3" class="text-center">No predictions</td></tr>'; return; }
+        const badges = {'Positive':'badge bg-success','Negative':'badge bg-danger','Neutral':'badge bg-warning'};
+        tbody.innerHTML = data.map(d => `<tr><td>${(d.review_text||'').substring(0,50)}</td><td><span class="${badges[d.sentiment]||'badge bg-secondary'}">${d.sentiment||'N/A'}</span></td><td>${d.confidence ? (d.confidence*100).toFixed(1)+'%' : 'N/A'}</td></tr>`).join('');
+    });
+}
+
+loadStats(); loadCharts(); loadPredictions();
+setInterval(() => { loadStats(); loadPredictions(); }, 30000);
+</script>
+</body>
+</html>

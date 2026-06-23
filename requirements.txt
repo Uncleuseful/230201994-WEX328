@@ -1,0 +1,13 @@
+
+---
+
+
+```txt
+flask==2.3.2
+pandas==2.0.3
+numpy==1.24.3
+scikit-learn==1.3.0
+nltk==3.8.1
+sqlalchemy==2.0.19
+plotly==5.15.0
+joblib==1.3.1
